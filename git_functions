@@ -1,0 +1,59 @@
+export GIT_INTEGRATION_POINT=master
+
+function gitpruneall {
+    for b in $(git remote); do
+        git remote prune $b
+    done
+}
+
+function gitfetchall {
+    for b in $(git remote); do
+        git fetch $b
+    done
+}
+
+function gitup {
+    local branch=${1:-$GIT_INTEGRATION_POINT}
+    gitpruneall \
+        && gitfetchall \
+        && git checkout $branch \
+        && git pull
+
+    if git show-ref | grep -q upstream/$branch; then
+        git rebase upstream/$branch && git push
+    fi
+}
+
+function gitco () {
+    if [[ -z $1 ]]; then
+        /bin/echo "Must provide a branch name"
+    else
+        local new_branch=$1
+        shift
+        gitup $* && \
+            git checkout -b $new_branch && \
+            git push --set-upstream origin $new_branch
+    fi
+}
+
+function gitreb {
+    local parent=${1:-$GIT_INTEGRATION_POINT}
+    local cur=$(git rev-parse --abbrev-ref HEAD)
+    if [[ "$cur" = $parent ]]; then
+        echo "Already on $parent. Nothing to do."
+    else
+        gitup $parent && git checkout $cur && \
+            git rebase $parent && \
+            git pushf
+    fi
+}
+
+function gitsquish {
+    local parent=${1:-$GIT_INTEGRATION_POINT}
+    local cur=$(git rev-parse --abbrev-ref HEAD)
+    if [[ "$cur" = $parent ]]; then
+        echo "Already on $parent. Nothing to do."
+    else
+        git rebase -i $(git merge-base $parent $cur) && git pushf
+    fi
+}
